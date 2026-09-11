@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
 python-multipart
-yt-dlp
+yt-dlp[default]
+yt-dlp-ejs
 spotdl==4.5.2
