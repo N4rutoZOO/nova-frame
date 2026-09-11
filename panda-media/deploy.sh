@@ -8,7 +8,7 @@ SECRET="youtube-cookies"
 COOKIE_MOUNT="/secrets/youtube-cookies.txt"
 
 cd "$(dirname "$0")"
-python3 -m py_compile app_v4.py
+python3 -m py_compile app_v4.py app_v4_runtime.py
 
 gcloud config set project "$PROJECT_ID"
 gcloud services enable \
