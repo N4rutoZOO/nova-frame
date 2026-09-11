@@ -8,7 +8,7 @@ SECRET="youtube-cookies"
 COOKIE_MOUNT="/secrets/youtube-cookies.txt"
 
 cd "$(dirname "$0")"
-python3 -m py_compile main.py
+python3 -m py_compile app_v2.py
 
 gcloud config set project "$PROJECT_ID"
 gcloud services enable \
@@ -21,16 +21,14 @@ SECRET_ARGS=()
 if gcloud secrets describe "$SECRET" >/dev/null 2>&1; then
   PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
   RUNTIME_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-
   gcloud secrets add-iam-policy-binding "$SECRET" \
     --member="serviceAccount:${RUNTIME_SA}" \
     --role="roles/secretmanager.secretAccessor" \
     --quiet >/dev/null
-
   SECRET_ARGS+=(--update-secrets="${COOKIE_MOUNT}=${SECRET}:latest")
   echo "YouTube cookies: secret ${SECRET} détecté et monté."
 else
-  echo "YouTube cookies: aucun secret ${SECRET}. Le site sera déployé, mais certaines vidéos YouTube peuvent demander une authentification."
+  echo "YouTube cookies: aucun secret ${SECRET}."
 fi
 
 gcloud run deploy "$SERVICE" \
