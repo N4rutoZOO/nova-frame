@@ -27,4 +27,4 @@ ENV PANDA_JOB_WORKERS=1
 ENV PANDA_MAX_WORKDIR_BYTES=6442450944
 ENV PANDA_YT_WORKER_POLL=1
 
-CMD ["sh","-c","python -m uvicorn app_v6_worker_runtime:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh","-c","python -m uvicorn app_v6_ui_runtime:app --host 0.0.0.0 --port ${PORT}"]
