@@ -8,6 +8,7 @@ import threading
 import time
 import zipfile
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import Form
 from fastapi.responses import JSONResponse
@@ -25,9 +26,45 @@ YOUTUBE_FRAGMENTS = max(1, min(int(os.getenv("PANDA_YOUTUBE_FRAGMENTS", "2")), 4
 INFO_CACHE_TTL = max(30, min(int(os.getenv("PANDA_INFO_CACHE_TTL", "180")), 1800))
 INFO_CACHE_MAX = max(16, min(int(os.getenv("PANDA_INFO_CACHE_MAX", "128")), 512))
 core.JOB_TTL = max(600, min(int(os.getenv("PANDA_JOB_TTL", "3600")), 21600))
+JOB_WORKERS = max(1, min(int(os.getenv("PANDA_JOB_WORKERS", "1")), 2))
+MAX_WORKDIR_BYTES = max(512 * 1024 * 1024, int(os.getenv("PANDA_MAX_WORKDIR_BYTES", str(6 * 1024 * 1024 * 1024))))
+
+# Heavy yt-dlp/FFmpeg jobs are serialized by default so two large playlists cannot exhaust RAM at once.
+try:
+    core.EXECUTOR.shutdown(wait=False, cancel_futures=True)
+except Exception:
+    pass
+core.EXECUTOR = ThreadPoolExecutor(max_workers=JOB_WORKERS, thread_name_prefix="panda-job")
 
 _INFO_CACHE = OrderedDict()
 _INFO_CACHE_LOCK = threading.Lock()
+
+
+def _workdir_size(root):
+    total = 0
+    try:
+        for base, _, files in os.walk(root):
+            for name in files:
+                try:
+                    total += os.path.getsize(os.path.join(base, name))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return total
+
+
+def _guard_workdir(proc, root):
+    used = _workdir_size(root)
+    if used <= MAX_WORKDIR_BYTES:
+        return used
+    if proc is not None:
+        cli._terminate(proc)
+    limit_gb = MAX_WORKDIR_BYTES / 1024 / 1024 / 1024
+    raise RuntimeError(
+        f"Ce téléchargement dépasse la limite de sécurité temporaire ({limit_gb:.1f} Go). "
+        "Utilise moins de vidéos à la fois ou une qualité plus basse."
+    )
 
 
 def _cache_get(key):
@@ -134,6 +171,7 @@ def optimized_run_ytdlp(job_id, args, cwd):
     tail = []
     last_progress = -1
     last_update = 0.0
+    last_space_check = 0.0
     try:
         while True:
             if core.is_cancelled(job_id):
@@ -167,6 +205,11 @@ def optimized_run_ytdlp(job_id, args, cwd):
                         )
                         last_progress = rounded
                         last_update = now
+
+            now = time.time()
+            if now - last_space_check >= 3.0:
+                _guard_workdir(proc, cwd)
+                last_space_check = now
 
             if proc.poll() is not None:
                 if proc.stdout:
@@ -340,6 +383,11 @@ def optimized_build_tracks_zip(
         if cover and os.path.isfile(cover):
             archive.write(cover, arcname=os.path.basename(cover))
 
+    try:
+        if os.path.abspath(source) != os.path.abspath(zip_path):
+            os.remove(source)
+    except OSError:
+        pass
     return zip_path
 
 
@@ -427,6 +475,7 @@ def optimized_playlist_download(job_id, payload, workdir, use_cookies=False):
     tail = []
     last_key = None
     last_update = 0.0
+    last_space_check = 0.0
     try:
         while True:
             if core.is_cancelled(job_id):
@@ -468,6 +517,11 @@ def optimized_playlist_download(job_id, payload, workdir, use_cookies=False):
                         )
                         last_key = key
                         last_update = now
+
+            now = time.time()
+            if now - last_space_check >= 3.0:
+                _guard_workdir(proc, workdir)
+                last_space_check = now
 
             if proc.poll() is not None:
                 if proc.stdout:
@@ -765,6 +819,8 @@ def health():
         "analysis_cache_ttl": INFO_CACHE_TTL,
         "analysis_cache_entries": cache_entries,
         "job_ttl": core.JOB_TTL,
+        "job_workers": JOB_WORKERS,
+        "max_workdir_gb": round(MAX_WORKDIR_BYTES / 1024 / 1024 / 1024, 1),
         "active_jobs": active,
         "ready_jobs": ready,
         "youtube_cookie_file": bool(core.cookie_path()),
