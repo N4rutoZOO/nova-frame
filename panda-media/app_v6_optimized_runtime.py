@@ -21,6 +21,7 @@ app = playlist.app
 
 VERSION = "6.6-optimized"
 FRAGMENTS = max(1, min(int(os.getenv("PANDA_YTDLP_FRAGMENTS", "4")), 8))
+YOUTUBE_FRAGMENTS = max(1, min(int(os.getenv("PANDA_YOUTUBE_FRAGMENTS", "2")), 4))
 INFO_CACHE_TTL = max(30, min(int(os.getenv("PANDA_INFO_CACHE_TTL", "180")), 1800))
 INFO_CACHE_MAX = max(16, min(int(os.getenv("PANDA_INFO_CACHE_MAX", "128")), 512))
 core.JOB_TTL = max(600, min(int(os.getenv("PANDA_JOB_TTL", "3600")), 21600))
@@ -64,7 +65,6 @@ def _video_selector(quality, video_format):
         fallback_filter = f"[height<={height}]"
 
     if video_format in {"mp4", "mov", "avi"}:
-        # Prefer an MP4/M4A pair first. It usually avoids an extra conversion/remux.
         return (
             f"bv*{height_filter}[ext=mp4]+ba[ext=m4a]/"
             f"bv*{height_filter}+ba/"
@@ -91,16 +91,16 @@ def optimized_yt_args(url, workdir, mode, quality, video_format):
     return args
 
 
-def _base_fast_flags(no_playlist=True):
+def _base_fast_flags(no_playlist=True, fragments=None):
     flags = [
         "--newline",
         "--progress",
-        "--retries", "8",
-        "--fragment-retries", "8",
+        "--retries", "10",
+        "--fragment-retries", "10",
         "--extractor-retries", "3",
         "--file-access-retries", "3",
         "--socket-timeout", "20",
-        "--concurrent-fragments", str(FRAGMENTS),
+        "--concurrent-fragments", str(fragments or FRAGMENTS),
         "--continue",
         "--part",
         "--embed-metadata",
@@ -112,9 +112,12 @@ def _base_fast_flags(no_playlist=True):
 
 
 def optimized_run_ytdlp(job_id, args, cwd):
+    target_url = str(args[-1]) if args else ""
+    youtube_target = "youtube.com" in target_url or "youtu.be" in target_url
+    fragment_count = YOUTUBE_FRAGMENTS if youtube_target else FRAGMENTS
     cmd = [
         *cli.YTDLP,
-        *_base_fast_flags(True),
+        *_base_fast_flags(True, fragment_count),
         "--progress-template",
         "download:PANDA|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
         *args,
@@ -150,7 +153,6 @@ def optimized_run_ytdlp(job_id, args, cwd):
                     eta = (parts[3] if len(parts) > 3 else "").strip()
                     now = time.time()
                     rounded = int(pct)
-                    # Avoid hammering the shared job lock for tiny progress changes.
                     if rounded != last_progress or now - last_update >= 1.0:
                         msg = f"Téléchargement {pct:.0f}%"
                         if speed and speed not in {"N/A", "Unknown"}:
@@ -394,7 +396,7 @@ def optimized_playlist_download(job_id, payload, workdir, use_cookies=False):
 
     cmd = [
         *cli.YTDLP,
-        *_base_fast_flags(False),
+        *_base_fast_flags(False, YOUTUBE_FRAGMENTS),
         "--yes-playlist",
         "--playlist-items", ",".join(str(x) for x in selected_one_based),
         "--windows-filenames",
@@ -571,7 +573,7 @@ def optimized_playlist_worker(job_id, payload):
             job_id,
             stage="downloading",
             progress=5,
-            message=f"yt-dlp · {FRAGMENTS} fragments simultanés",
+            message=f"yt-dlp · {YOUTUBE_FRAGMENTS} fragments simultanés",
         )
         try:
             optimized_playlist_download(job_id, payload, workdir, False)
@@ -615,7 +617,6 @@ def optimized_playlist_worker(job_id, payload):
                 final = convert_playlist_video(source, wanted_format, workdir, pos)
             final_files.append(final)
 
-        # Remove obsolete source variants after conversion to reduce /tmp pressure.
         keep = {os.path.abspath(path) for path in final_files}
         for path in files:
             if os.path.abspath(path) not in keep:
@@ -641,7 +642,6 @@ def optimized_playlist_worker(job_id, payload):
                 if core.is_cancelled(job_id):
                     raise InterruptedError("Job annulé")
                 archive.write(path, arcname=os.path.basename(path))
-                # Media is already compressed. Once copied into the stored ZIP, free it.
                 try:
                     os.remove(path)
                 except OSError:
@@ -692,7 +692,6 @@ def optimized_playlist_worker(job_id, payload):
         )
 
 
-# Apply patches before the first user request.
 cli._yt_args = optimized_yt_args
 cli._run_ytdlp = optimized_run_ytdlp
 core.build_tracks_zip = optimized_build_tracks_zip
@@ -710,8 +709,6 @@ def optimized_worker(job_id, payload):
 playlist.worker = optimized_worker
 core.worker = optimized_worker
 
-
-# Cache only successful analysis results. Authentication/errors are never cached.
 _original_media_info = playlist.media_info
 stable._remove_route("/info", "POST")
 
@@ -764,6 +761,7 @@ def health():
         "playlist_editor": True,
         "playlist_limit": playlist.PLAYLIST_LIMIT,
         "fragment_concurrency": FRAGMENTS,
+        "youtube_fragment_concurrency": YOUTUBE_FRAGMENTS,
         "analysis_cache_ttl": INFO_CACHE_TTL,
         "analysis_cache_entries": cache_entries,
         "job_ttl": core.JOB_TTL,
