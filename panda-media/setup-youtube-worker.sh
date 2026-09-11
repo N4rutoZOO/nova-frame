@@ -76,10 +76,10 @@ echo "Installation du service worker..."
 gcloud compute ssh "$INSTANCE" --zone "$ZONE" --command="
 set -e
 sudo apt-get update -qq
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv curl ca-certificates ffmpeg chromium >/dev/null
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv curl ca-certificates ffmpeg chromium unzip >/dev/null
 mkdir -p /home/$WORKER_USER/chrome-profile /home/$WORKER_USER/Downloads
 if [[ ! -x /home/$WORKER_USER/.deno/bin/deno ]]; then
-  curl -fsSL https://deno.land/install.sh | sh >/dev/null
+  DENO_INSTALL=/home/$WORKER_USER/.deno curl -fsSL https://deno.land/install.sh | sh >/dev/null
 fi
 sudo mkdir -p /opt/panda-youtube-worker
 sudo mv /tmp/youtube_worker_server.py /opt/panda-youtube-worker/youtube_worker_server.py
