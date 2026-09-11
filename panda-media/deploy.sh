@@ -20,6 +20,7 @@ python3 -m py_compile \
   app_v6_playlist_runtime.py \
   app_v6_optimized_runtime.py \
   app_v6_worker_runtime.py \
+  app_v6_ui_runtime.py \
   youtube_worker_server.py
 
 gcloud config set project "$PROJECT_ID"
@@ -103,7 +104,7 @@ gcloud run deploy "$SERVICE" \
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 echo
-echo "panda.download.com · V6.7 worker auth"
+echo "panda.download.com · V6.8 web/mobile"
 echo "$URL"
 echo
 echo "Health: ${URL}/health"
