@@ -54,9 +54,9 @@ gcloud run deploy "$SERVICE" \
   --region "$REGION" \
   --allow-unauthenticated \
   --execution-environment gen2 \
-  --memory 4Gi \
+  --memory 8Gi \
   --cpu 2 \
-  --concurrency 8 \
+  --concurrency 4 \
   --timeout 3600 \
   --min-instances 0 \
   --max-instances 1 \
