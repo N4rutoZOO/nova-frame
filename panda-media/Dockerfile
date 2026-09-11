@@ -18,5 +18,9 @@ COPY . .
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 ENV YTDLP_COOKIES_FILE=/secrets/youtube-cookies.txt
+ENV PANDA_YTDLP_FRAGMENTS=4
+ENV PANDA_INFO_CACHE_TTL=180
+ENV PANDA_INFO_CACHE_MAX=128
+ENV PANDA_JOB_TTL=3600
 
-CMD ["sh","-c","python -m uvicorn app_v6_playlist_runtime:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh","-c","python -m uvicorn app_v6_optimized_runtime:app --host 0.0.0.0 --port ${PORT}"]
