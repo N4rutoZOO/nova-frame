@@ -8,7 +8,7 @@ SECRET="youtube-cookies"
 COOKIE_MOUNT="/secrets/youtube-cookies.txt"
 
 cd "$(dirname "$0")"
-python3 -m py_compile app_v2.py
+python3 -m py_compile app_v3.py
 
 gcloud config set project "$PROJECT_ID"
 gcloud services enable \
@@ -44,7 +44,7 @@ gcloud run deploy "$SERVICE" \
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 echo
-echo "panda.download.com"
+echo "panda.download.com · V3"
 echo "$URL"
 echo
 echo "Health: ${URL}/health"
