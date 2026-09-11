@@ -6,6 +6,7 @@ REGION="europe-west1"
 SERVICE="panda-download"
 SECRET="youtube-cookies"
 COOKIE_MOUNT="/secrets/youtube-cookies.txt"
+VERSION_FILE=".youtube-secret-version"
 
 cd "$(dirname "$0")"
 python3 -m py_compile app_v6.py app_v6_runtime.py
@@ -25,10 +26,22 @@ if gcloud secrets describe "$SECRET" >/dev/null 2>&1; then
     --member="serviceAccount:${RUNTIME_SA}" \
     --role="roles/secretmanager.secretAccessor" \
     --quiet >/dev/null
-  SECRET_ARGS+=(--update-secrets="${COOKIE_MOUNT}=${SECRET}:latest")
-  echo "YouTube cookies: secret ${SECRET} détecté et monté."
+
+  if [[ -f "$VERSION_FILE" ]]; then
+    SECRET_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+  else
+    SECRET_VERSION="$(gcloud secrets versions list "$SECRET" --filter='state=ENABLED' --sort-by='~createTime' --limit=1 --format='value(name)')"
+  fi
+
+  if [[ -z "$SECRET_VERSION" ]]; then
+    echo "ERREUR: aucune version active du secret $SECRET."
+    exit 1
+  fi
+
+  SECRET_ARGS+=(--update-secrets="${COOKIE_MOUNT}=${SECRET}:${SECRET_VERSION}")
+  echo "YouTube cookies: secret ${SECRET} version ${SECRET_VERSION} monté et épinglé."
 else
-  echo "YouTube cookies: aucun secret ${SECRET}."
+  echo "YouTube cookies: aucun secret ${SECRET}. Les vidéos publiques continueront d'être testées sans cookies."
 fi
 
 gcloud run deploy "$SERVICE" \
@@ -46,7 +59,9 @@ gcloud run deploy "$SERVICE" \
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 echo
-echo "panda.download.com · V6.1 stable"
+echo "panda.download.com · V6.2 stable"
 echo "$URL"
 echo
 echo "Health: ${URL}/health"
+curl -fsS "${URL}/health" || true
+echo
