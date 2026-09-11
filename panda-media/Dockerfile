@@ -19,4 +19,4 @@ ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 ENV YTDLP_COOKIES_FILE=/secrets/youtube-cookies.txt
 
-CMD ["sh","-c","python -m uvicorn app_v6_runtime:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh","-c","python -m uvicorn app_v6_runtime_robust:app --host 0.0.0.0 --port ${PORT}"]
