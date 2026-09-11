@@ -9,7 +9,7 @@ COOKIE_MOUNT="/secrets/youtube-cookies.txt"
 VERSION_FILE=".youtube-secret-version"
 
 cd "$(dirname "$0")"
-python3 -m py_compile app_v6.py app_v6_runtime.py
+python3 -m py_compile app_v6.py app_v6_runtime.py app_v6_cli_runtime.py app_v6_playlist_runtime.py
 
 gcloud config set project "$PROJECT_ID"
 gcloud services enable \
@@ -41,7 +41,7 @@ if gcloud secrets describe "$SECRET" >/dev/null 2>&1; then
   SECRET_ARGS+=(--update-secrets="${COOKIE_MOUNT}=${SECRET}:${SECRET_VERSION}")
   echo "YouTube cookies: secret ${SECRET} version ${SECRET_VERSION} monté et épinglé."
 else
-  echo "YouTube cookies: aucun secret ${SECRET}. Les vidéos publiques continueront d'être testées sans cookies."
+  echo "YouTube cookies: aucun secret ${SECRET}. Les vidéos publiques seront testées sans cookies."
 fi
 
 gcloud run deploy "$SERVICE" \
@@ -59,7 +59,7 @@ gcloud run deploy "$SERVICE" \
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 echo
-echo "panda.download.com · V6.2 stable"
+echo "panda.download.com · V6.5 playlists"
 echo "$URL"
 echo
 echo "Health: ${URL}/health"
