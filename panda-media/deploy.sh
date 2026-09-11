@@ -8,7 +8,7 @@ SECRET="youtube-cookies"
 COOKIE_MOUNT="/secrets/youtube-cookies.txt"
 
 cd "$(dirname "$0")"
-python3 -m py_compile app_v4.py app_v4_runtime.py
+python3 -m py_compile app_v5.py
 
 gcloud config set project "$PROJECT_ID"
 gcloud services enable \
@@ -35,16 +35,16 @@ gcloud run deploy "$SERVICE" \
   --source . \
   --region "$REGION" \
   --allow-unauthenticated \
-  --memory 2Gi \
+  --memory 4Gi \
   --cpu 2 \
-  --concurrency 1 \
+  --concurrency 2 \
   --timeout 3600 \
-  --max-instances 2 \
+  --max-instances 3 \
   "${SECRET_ARGS[@]}"
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 echo
-echo "panda.download.com · V4"
+echo "panda.download.com · V5"
 echo "$URL"
 echo
 echo "Health: ${URL}/health"
