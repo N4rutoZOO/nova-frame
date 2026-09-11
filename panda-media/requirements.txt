@@ -1,6 +1,6 @@
-fastapi
-uvicorn[standard]
-python-multipart
-yt-dlp[default]
+fastapi>=0.103.0,<0.104
+uvicorn[standard]>=0.23.2,<0.24
+python-multipart>=0.0.20
+yt-dlp[default]>=2026.07.04,<2027
 yt-dlp-ejs
 spotdl==4.5.2
