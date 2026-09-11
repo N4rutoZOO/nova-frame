@@ -7,6 +7,7 @@ __pycache__/
 *.log
 .DS_Store
 downloads/
+.youtube-secret-version
 app_v2.py
 app_v4.py
 app_v4_runtime.py
